@@ -92,19 +92,26 @@ class ChannelMap:
         }
 
 
-def _grade_bin(excess: float, allan_ratio: float) -> str:
+def _grade_bin(
+    excess: float,
+    allan_ratio: float,
+    excess_a: float = 2.0,
+    allan_a: float = 1.5,
+    excess_b: float = 5.0,
+    excess_c: float = 10.0,
+) -> str:
     """Grade a wavelength bin by systematic excess and Allan ratio.
 
-    A: excess < 2 AND allan < 1.5  (photon-limited, white noise)
-    B: excess < 5                   (moderate systematics)
-    C: excess < 10                   (significant systematics)
-    D: excess >= 10                  (systematic-dominated, untrustworthy)
+    A: excess < excess_a AND allan < allan_a  (photon-limited, white noise)
+    B: excess < excess_b                       (moderate systematics)
+    C: excess < excess_c                       (significant systematics)
+    D: excess >= excess_c                      (systematic-dominated, untrustworthy)
     """
-    if excess < 2 and allan_ratio < 1.5:
+    if excess < excess_a and allan_ratio < allan_a:
         return "A"
-    elif excess < 5:
+    elif excess < excess_b:
         return "B"
-    elif excess < 10:
+    elif excess < excess_c:
         return "C"
     else:
         return "D"
@@ -156,6 +163,10 @@ def channel_quality(
     in_transit_mask: np.ndarray,
     n_bins: int = 50,
     flux_error_cube: np.ndarray | None = None,
+    excess_a: float = 2.0,
+    allan_a: float = 1.5,
+    excess_b: float = 5.0,
+    excess_c: float = 10.0,
 ) -> list[BinResult]:
     """Compute per-wavelength channel quality diagnostics.
 
@@ -174,6 +185,14 @@ def channel_quality(
         the noise reference instead of sqrt(flux). This gives correct
         systematic excess for calibrated data where flux is not in photon
         counts.
+    excess_a : float
+        Systematic excess threshold for grade A (default 2.0).
+    allan_a : float
+        Allan ratio threshold for grade A (default 1.5).
+    excess_b : float
+        Systematic excess threshold for grade B (default 5.0).
+    excess_c : float
+        Systematic excess threshold for grade C/D boundary (default 10.0).
 
     Returns
     -------
@@ -234,7 +253,7 @@ def channel_quality(
         allan = _compute_allan(oot_flux, scatter)
         worst_allan = max((ar["ratio"] for ar in allan), default=1.0)
 
-        grade = _grade_bin(excess, worst_allan)
+        grade = _grade_bin(excess, worst_allan, excess_a, allan_a, excess_b, excess_c)
 
         bins.append(
             BinResult(
@@ -255,16 +274,22 @@ def channel_quality(
     return bins
 
 
-def _find_trust_regions(bins: list[BinResult]) -> list[dict]:
+def _find_trust_regions(
+    bins: list[BinResult],
+    excess_a: float = 2.0,
+    allan_a: float = 1.5,
+) -> list[dict]:
     """Identify contiguous wavelength regions with low systematic excess.
 
     Trust region criteria:
-      - scatter < 2 * photon noise (excess < 2)
-      - Allan ratio < 1.5 (noise averages down properly)
+      - scatter < excess_a * photon noise (excess < excess_a)
+      - Allan ratio < allan_a (noise averages down properly)
 
     Returns list of dicts with wl_min, wl_max, mean_scatter_ppm, n_bins.
     """
-    trust_bins = [b for b in bins if b.systematic_excess < 2 and b.allan_worst_ratio < 1.5]
+    trust_bins = [
+        b for b in bins if b.systematic_excess < excess_a and b.allan_worst_ratio < allan_a
+    ]
 
     if not trust_bins:
         return []
@@ -303,19 +328,24 @@ def _find_trust_regions(bins: list[BinResult]) -> list[dict]:
     ]
 
 
-def _compute_weights(bins: list[BinResult]) -> np.ndarray:
+def _compute_weights(
+    bins: list[BinResult],
+    excess_b: float = 5.0,
+    excess_c: float = 10.0,
+) -> np.ndarray:
     """Compute diversity combining weights from channel quality.
 
     Weights: w_k = 1/scatter_k^2 for A/B grades, soft rolloff for C, zero for D.
     Normalized so they sum to 1.
     """
+    rolloff_span = max(excess_c - excess_b, np.finfo(float).eps)
     weights = np.zeros(len(bins))
     for i, b in enumerate(bins):
         if b.grade == "D":
             weights[i] = 0.0
         elif b.grade == "C":
             base = 1.0 / b.scatter_ppm**2 if b.scatter_ppm > 0 else 0.0
-            rolloff = max(0, 1.0 - (b.systematic_excess - 5) / 5)
+            rolloff = max(0.0, 1.0 - (b.systematic_excess - excess_b) / rolloff_span)
             weights[i] = base * rolloff
         else:
             weights[i] = 1.0 / b.scatter_ppm**2 if b.scatter_ppm > 0 else 0.0
@@ -378,6 +408,10 @@ def compute_channel_map(
     in_transit_mask: np.ndarray,
     n_bins: int = 50,
     flux_error_cube: np.ndarray | None = None,
+    excess_a: float = 2.0,
+    allan_a: float = 1.5,
+    excess_b: float = 5.0,
+    excess_c: float = 10.0,
 ) -> ChannelMap:
     """Compute full channel quality map with trust regions and weights.
 
@@ -393,13 +427,23 @@ def compute_channel_map(
     flux_error_cube : ndarray, optional
         Per-integration flux errors. If provided, used as noise floor
         reference for computing systematic excess.
+    excess_a : float
+        Systematic excess threshold for grade A (default 2.0).
+    allan_a : float
+        Allan ratio threshold for grade A (default 1.5).
+    excess_b : float
+        Systematic excess threshold for grade B (default 5.0).
+    excess_c : float
+        Systematic excess threshold for grade C/D boundary (default 10.0).
 
     Returns
     -------
     ChannelMap
     """
     bins = channel_quality(
-        flux_cube, wavelength, in_transit_mask, n_bins, flux_error_cube=flux_error_cube
+        flux_cube, wavelength, in_transit_mask, n_bins,
+        flux_error_cube=flux_error_cube,
+        excess_a=excess_a, allan_a=allan_a, excess_b=excess_b, excess_c=excess_c,
     )
 
     if not bins:
@@ -417,8 +461,8 @@ def compute_channel_map(
     allans = [b.allan_worst_ratio for b in bins]
     grades = [b.grade for b in bins]
 
-    trust_regions = _find_trust_regions(bins)
-    weights = _compute_weights(bins)
+    trust_regions = _find_trust_regions(bins, excess_a=excess_a, allan_a=allan_a)
+    weights = _compute_weights(bins, excess_b=excess_b, excess_c=excess_c)
     wl_centers = np.array([b.wl_center for b in bins])
 
     detectable = _detectable_molecules(trust_regions, float(np.median(scatters)))

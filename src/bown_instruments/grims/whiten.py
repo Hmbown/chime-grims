@@ -154,6 +154,9 @@ def prepare_ringdown_for_analysis(
     fmin_pad: float = 0.5,
     fmax_pad: float = 1.3,
     t_start_m: float = 10.0,
+    nperseg: int = 0,
+    fmin_whiten: float | None = None,
+    fmax_whiten: float | None = None,
 ) -> dict:
     """Full whitening + bandpass + ringdown extraction pipeline.
 
@@ -169,8 +172,12 @@ def prepare_ringdown_for_analysis(
     detector : detector name (None = use first available)
     fmin_pad : multiply lowest QNM frequency by this for low cutoff
     fmax_pad : multiply highest QNM frequency (nonlinear) by this for high cutoff
-
     t_start_m : ringdown start time in units of M after merger (default 10.0)
+    nperseg : Welch segment length for ASD estimation (0 = auto)
+    fmin_whiten : explicit low-frequency cutoff for whitening in Hz
+                  (None = derived from QNM frequencies via fmin_pad)
+    fmax_whiten : explicit high-frequency cutoff for bandpass in Hz
+                  (None = derived from QNM frequencies via fmax_pad)
 
     Returns
     -------
@@ -201,7 +208,7 @@ def prepare_ringdown_for_analysis(
     f_440 = mode_440.physical_frequency_hz(mass)
 
     # Bandpass range: from below the fundamental to above the nonlinear mode
-    f_low = max(20.0, f_220 * fmin_pad)
+    f_low = fmin_whiten if fmin_whiten is not None else max(20.0, f_220 * fmin_pad)
 
     # Load the FULL 32-second file (not just the ringdown segment).
     # Try local cache first; fall back to download if needed.
@@ -245,7 +252,7 @@ def prepare_ringdown_for_analysis(
     full_time = loaded["time"]
     sample_rate = loaded["sample_rate"]
 
-    f_high = min(0.45 * sample_rate, max(f_nl, f_440) * fmax_pad)
+    f_high = fmax_whiten if fmax_whiten is not None else min(0.45 * sample_rate, max(f_nl, f_440) * fmax_pad)
 
     merger_time = float(event["gps_time"])
     ringdown_start = merger_time + t_start_m * m_seconds
@@ -257,6 +264,7 @@ def prepare_ringdown_for_analysis(
         merger_time=merger_time,
         time=full_time,
         exclusion_window=2.0,
+        nperseg=nperseg,
     )
 
     # Whiten the full strain

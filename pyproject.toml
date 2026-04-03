@@ -56,7 +56,8 @@ dev = [
 bown = "bown_instruments.cli:main"
 
 [project.urls]
-Repository = "https://github.com/Hmbown/bown-instruments"
+Homepage = "https://github.com/Hmbown/chime-grims"
+Repository = "https://github.com/Hmbown/chime-grims"
 "Issue Tracker" = "https://linear.app/shannon-labs/project/bown-instruments-9a003df614d9"
 
 [tool.setuptools.packages.find]

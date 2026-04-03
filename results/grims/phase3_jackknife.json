@@ -6,7 +6,8 @@
   "jackknife_std": 0.0007740116896210262,
   "max_shift": 0.0038498673361547896,
   "max_shift_event": "GW200208_222617",
-  "is_stable": "False",
+  "is_stable": false,
+  "stability_caveat": "Jackknife is_stable=false: removing the top 3 influential events (GW200208_222617, GW200225_060421, GW191215_223052) shifts kappa by >2x the jackknife std. The Gini coefficient of jackknife shifts is 0.7753, indicating extreme concentration of influence. The 2.2-sigma detection significance should NOT be cited as robust until a Monte Carlo null distribution and realistic-SNR injection campaign (kappa~0.01-0.05) are completed.",
   "n_eff": 21.40112157947961,
   "max_fractional_influence": 0.569648720442371,
   "influential_events": [

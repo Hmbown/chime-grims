@@ -6,10 +6,10 @@ authors:
   - family-names: Bown
     given-names: Hunter
     email: "hunter@shannonlabs.dev"
-repository-code: "https://github.com/Hmbown/bownpower"
+repository-code: "https://github.com/Hmbown/chime-grims"
 license: MIT
-version: 0.1.0
-date-released: "2025-04-01"
+version: 0.2.0
+date-released: "2026-04-03"
 keywords:
   - jwst
   - exoplanet

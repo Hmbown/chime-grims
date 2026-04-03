@@ -5,11 +5,11 @@ How to find, fetch, and verify external data for both instruments.
 ## Quick Status Check
 
 ```bash
-# GRIM-S: what strain data do we have?
-cd grims && python scripts/check_data.py --ringdown-only
+# GRIM-S: what strain data do we have? (from repository root)
+python scripts/grims/check_data.py --ringdown-only
 
 # CHIME: list known targets and ephemeris
-python -c "from chime.ephemeris import list_targets; print(list_targets())"
+python -c "from bown_instruments.chime.ephemeris import list_targets; print(list_targets())"
 ```
 
 ## GRIM-S (Gravitational Wave Ringdowns)
@@ -24,24 +24,27 @@ Strain data in HDF5 format, 4096 Hz sampling.
 ### Files
 | File | Purpose |
 |------|---------|
-| `grims/results/gwtc_full_catalog.json` | Full BBH catalog (150 events, O1-O4) |
-| `grims/results/download_queue.json` | Pre-resolved strain file URLs (448 entries) |
-| `grims/data/*.hdf5` | Local strain cache (git-ignored except GW150914) |
+| `results/grims/gwtc_full_catalog.json` | Full BBH catalog (150 events, O1-O4) |
+| `results/grims/download_queue.json` | Pre-resolved strain file URLs (448 entries) |
+| `scripts/data/*.hdf5` | Local strain cache (gitignored); this is the directory `scripts/grims/check_data.py` and `download_multidet.py` scan |
+
+Some older runners expect a copy of `gwtc_full_catalog.json` under `scripts/data/`; the committed source of truth is `results/grims/gwtc_full_catalog.json`. Only GW150914 (~1 MB) is committed when present, per repository policy.
 
 ### Commands
 
 ```bash
+# From repository root
 # Check what data is locally available
-python scripts/check_data.py --ringdown-only
+python scripts/grims/check_data.py --ringdown-only
 
 # Download missing L1/V1 strain for events that have H1
-python scripts/download_multidet.py
+python scripts/grims/download_multidet.py
 
 # Refresh catalog from GWOSC (if new events released)
-python scripts/refresh_catalog.py --write
+python scripts/grims/refresh_catalog.py --write
 
 # Rebuild download queue with resolved URLs
-python scripts/refresh_download_queue.py --write
+python scripts/grims/refresh_download_queue.py --write
 ```
 
 ### Storage Budget
@@ -65,29 +68,29 @@ JWST NIRSpec x1dints FITS files (per-integration extracted spectra).
 ### Files
 | File | Purpose |
 |------|---------|
-| `chime/results/data_manifest.json` | Pinned observation IDs, filenames, MAST URIs |
-| `chime/results/channel_survey/phase2_survey.json` | Per-segment quality measurements |
-| `chime/results/channel_survey/segment_file_inventory.json` | MAST product inventory |
-| `chime/src/chime/ephemeris.py` | Transit ephemerides (27 systems) |
+| `results/chime/data_manifest.json` | Pinned observation IDs, filenames, MAST URIs |
+| `results/chime/channel_survey/phase2_survey.json` | Per-segment quality measurements |
+| `results/chime/channel_survey/segment_file_inventory.json` | MAST product inventory |
+| `src/bown_instruments/chime/ephemeris.py` | Transit ephemerides (34 lookup keys in `EPHEMERIDES`) |
 
 ### Commands
 
 ```bash
 # Search for JWST observations of a target
-python -c "from chime.mast import find_x1dints; print(find_x1dints('WASP-39'))"
+python -c "from bown_instruments.chime.mast import find_x1dints; print(find_x1dints('WASP-39'))"
 
 # Run multi-target survey
-python chime/examples/multi_target_survey.py
+python examples/chime/multi_target_survey.py
 
 # Check ephemeris for a target
-python -c "from chime.ephemeris import get_ephemeris; print(get_ephemeris('WASP-39'))"
+python -c "from bown_instruments.chime.ephemeris import get_ephemeris; print(get_ephemeris('WASP-39'))"
 ```
 
 ### Cache Locations
 - Downloads go to `tempfile.mkdtemp(prefix='chime_')` by default (not persistent)
 - To persist: pass `download_dir='chime/data/'` to `download_product()`
 - FITS files are NOT committed to git (too large)
-- Results JSONs in `chime/results/` ARE committed
+- Results JSONs in `results/chime/` ARE committed
 
 ### Completed Survey Data
 Already analyzed (pinned in `data_manifest.json`):
@@ -101,12 +104,12 @@ Already analyzed (pinned in `data_manifest.json`):
 ## What's Missing and How to Get It
 
 ### GRIM-S
-Run `python grims/scripts/check_data.py --ringdown-only` for a current report.
+Run `python scripts/grims/check_data.py --ringdown-only` for a current report.
 As of 2026-04-03: 133 of 134 ringdown events need strain data downloaded.
 Estimated total download: ~8.5 GB.
 
 ### CHIME
 All results from the completed survey are committed.
-For the next campaign, use `chime.mast.find_x1dints(target)` to discover
-available observations, then `chime.mast.download_product()` to fetch.
+For the next campaign, use `bown_instruments.chime.mast.find_x1dints(target)` to discover
+available observations, then `bown_instruments.chime.mast.download_product()` to fetch.
 The `data_manifest.json` pins exactly which files were used in prior analysis.

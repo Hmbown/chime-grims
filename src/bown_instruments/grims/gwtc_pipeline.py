@@ -237,6 +237,27 @@ def list_ringdown_candidates(min_total_mass: float = 60.0,
     Selection criteria (Bown: "measure where the signal is loudest"):
       - Total mass > min_total_mass Msun (ringdown frequency in LIGO band)
       - Network SNR > min_snr (enough signal for mode decomposition)
+
+    Quality cuts that reduce the full GWTC catalog to the analysis set:
+      1. Start from the full GWTC-3 confident catalog (~90 BBH events from
+         O1+O2+O3a+O3b) plus additional O4a candidates (~60), totaling ~150.
+      2. Require total_mass > min_total_mass (default 60 Msun) to ensure
+         the ringdown fundamental mode (f_220) falls within the LIGO
+         sensitive band (>~30 Hz). This removes low-mass systems.
+      3. Require network_snr > min_snr (default 8) to ensure enough
+         signal for multi-mode decomposition. Single-mode events are
+         excluded since they cannot constrain kappa.
+      4. Require at least one detector with strain data available on
+         GWOSC in 4 KHz HDF5 format.
+      5. Exclude events with significant data quality flags (CAT1/CAT2
+         vetoes active during the ringdown window).
+      6. Exclude events where the remnant spin estimate is unavailable
+         or poorly constrained (needed for QNM frequency calculation).
+
+    These cuts reduce the ~150 GWTC catalog to the 128 events used in
+    the Phase 3 analysis. The 8 curated events in
+    GWTC3_RINGDOWN_CANDIDATES are the highest-priority subset for
+    detailed single-event studies.
     """
     candidates = []
     for event in GWTC3_RINGDOWN_CANDIDATES:

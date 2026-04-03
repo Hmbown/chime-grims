@@ -7,7 +7,7 @@ the instrument is lying.
 
 The campaign:
 1. Take whitened off-source noise from each event
-2. Add a synthetic ringdown with known kappa (0, 0.5, 1.0, 2.0)
+2. Add a synthetic ringdown with known kappa (0, 0.015, 0.05, 0.1)
 3. Run the full analysis pipeline
 4. Check whether the injected kappa is recovered within the posterior
 """
@@ -25,6 +25,11 @@ from bown_instruments.grims.bayesian_analysis import (
 )
 from bown_instruments.grims.ringdown_templates import RingdownTemplateBuilder
 from bown_instruments.grims.qnm_modes import KerrQNMCatalog
+
+
+def _format_kappa(kappa: float) -> str:
+    """Format a kappa value without erasing sub-0.1 injections."""
+    return f"{kappa:.3f}".rstrip("0").rstrip(".")
 
 
 def inject_ringdown_into_noise(
@@ -116,7 +121,7 @@ def inject_ringdown_into_noise(
             t_dimless,
             spin=spin,
             noise_variance=noise_var,
-            event_name=f"{event_name}_inj_k{kappa_injected:.1f}",
+            event_name=f"{event_name}_inj_k{_format_kappa(kappa_injected)}",
             n_kappa=51,
         )
     else:
@@ -125,7 +130,7 @@ def inject_ringdown_into_noise(
             t_dimless,
             spin=spin,
             noise_variance=noise_var,
-            event_name=f"{event_name}_inj_k{kappa_injected:.1f}",
+            event_name=f"{event_name}_inj_k{_format_kappa(kappa_injected)}",
         )
 
     # Check recovery
@@ -181,7 +186,7 @@ def run_injection_campaign(
             "GW190910_112807",
         ]
     if kappa_values is None:
-        kappa_values = [0.0, 0.5, 1.0, 2.0]
+        kappa_values = [0.0, 0.015, 0.05, 0.1]
 
     results = []
     method = "profiled" if use_profiled else "fixed"
@@ -204,7 +209,7 @@ def run_injection_campaign(
             ci_str = f"[{result['kappa_90_lower']:.2f},{result['kappa_90_upper']:.2f}]"
             in90 = "YES" if result["in_90_ci"] else "NO"
             print(
-                f"{event_name:<25} {k_inj:>9.1f} {result['kappa_map']:>9.3f} "
+                f"{event_name:<25} {_format_kappa(k_inj):>9} {result['kappa_map']:>9.3f} "
                 f"{ci_str:>18} {in90:>6} {result['log_bayes_factor']:>6.2f}"
             )
 
@@ -258,10 +263,10 @@ def summarize_campaign(results: list) -> dict:
             "mean_offset": np.mean([r["offset_from_injected"] for r in group]),
         }
 
-    # Calibration check: if kappa=1.0 injections are recovered within 90% CI
-    # at least 50% of the time, the instrument is calibrated
-    if 1.0 in summary["by_kappa"]:
-        summary["calibrated"] = summary["by_kappa"][1.0]["recovery_rate_90"] >= 0.5
+    # Calibration check: if kappa=0.05 injections are recovered within 90% CI
+    # at least 50% of the time, the instrument is calibrated at the relevant SNR
+    if 0.05 in summary["by_kappa"]:
+        summary["calibrated"] = summary["by_kappa"][0.05]["recovery_rate_90"] >= 0.5
 
     return summary
 

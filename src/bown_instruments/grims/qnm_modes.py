@@ -16,7 +16,12 @@ from dataclasses import dataclass
 
 import numpy as np
 
-warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning, module=r"qnm\b")
+warnings.filterwarnings(
+    "ignore",
+    category=np.exceptions.VisibleDeprecationWarning,
+    module=r"qnm\b",
+)
 
 import qnm
 

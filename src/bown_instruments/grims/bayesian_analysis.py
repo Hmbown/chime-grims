@@ -43,7 +43,9 @@ class PosteriorResult:
     kappa_lower_68: float  # 16th percentile
     kappa_upper_68: float  # 84th percentile
     log_bayes_factor: float  # ln B(NL vs linear-only)
-    detection_sigma: float  # significance of kappa != 0
+    detection_sigma: float  # significance of kappa != 0 (uncorrected)
+    detection_sigma_corrected: float = 0.0  # significance after look-elsewhere correction
+    n_trials: int = 1  # number of independent trials (for look-elsewhere correction)
     fit_method: str = "fixed_linear_parameters"
     linear_mode_estimates: dict = field(default_factory=dict)
 
@@ -63,7 +65,25 @@ class StackedPosterior:
     kappa_upper_90: float
     log_bayes_factor: float
     detection_sigma: float
+    detection_sigma_corrected: float
+    n_trials: int
     n_events: int
+
+
+def _look_elsewhere_correction(sigma: float, n_trials: int) -> float:
+    """Apply look-elsewhere effect correction to a significance estimate.
+
+    The corrected p-value is p_corrected = 1 - (1 - p_local)^n_trials,
+    which for small p approximates to p_corrected ~ n_trials * p_local.
+    Returns the corrected significance in sigma units.
+    """
+    from scipy.stats import norm
+
+    if n_trials <= 1 or sigma <= 0:
+        return sigma
+    p_local = norm.sf(sigma)  # one-sided p-value
+    p_corrected = 1.0 - (1.0 - p_local) ** n_trials
+    return float(norm.isf(max(p_corrected, 1e-300)))
 
 
 def _log_trapezoid(log_y: np.ndarray, x: np.ndarray) -> float:
@@ -197,6 +217,7 @@ def estimate_kappa_posterior(
     phi_nl: float = 0.0,
     fit_method: str = "fixed_linear_parameters",
     linear_mode_estimates: dict | None = None,
+    n_trials: int = 1,
 ) -> PosteriorResult:
     """Compute the posterior distribution of kappa for one event.
 
@@ -211,6 +232,8 @@ def estimate_kappa_posterior(
     kappa_min, kappa_max : prior range
     n_kappa : grid resolution
     prior : "uniform" or "log_uniform"
+    n_trials : number of independent trials for look-elsewhere correction
+               (e.g., number of start-time or bandpass configurations searched)
     """
     builder = RingdownTemplateBuilder()
     kappa_grid = np.linspace(kappa_min, kappa_max, n_kappa)
@@ -288,6 +311,7 @@ def estimate_kappa_posterior(
 
     # Likelihood-ratio significance for the nonlinear model over kappa = 0.
     sigma_kappa = np.sqrt(max(0.0, 2.0 * (np.max(log_l) - log_l_linear)))
+    sigma_corrected = _look_elsewhere_correction(sigma_kappa, n_trials)
 
     return PosteriorResult(
         event_name=event_name,
@@ -303,6 +327,8 @@ def estimate_kappa_posterior(
         kappa_upper_68=kappa_upper_68,
         log_bayes_factor=log_bayes_factor,
         detection_sigma=sigma_kappa,
+        detection_sigma_corrected=sigma_corrected,
+        n_trials=n_trials,
         fit_method=fit_method,
         linear_mode_estimates=linear_mode_estimates or {},
     )
@@ -479,6 +505,8 @@ def estimate_kappa_posterior_profiled(
         kappa_upper_68=kappa_upper_68,
         log_bayes_factor=log_bayes_factor,
         detection_sigma=sigma_kappa,
+        detection_sigma_corrected=sigma_kappa,
+        n_trials=1,
         fit_method="profile_likelihood",
         linear_mode_estimates=linear_mode_estimates,
     )
@@ -658,6 +686,8 @@ def estimate_kappa_posterior_freq_domain(
         kappa_upper_68=kappa_upper_68,
         log_bayes_factor=log_bayes_factor,
         detection_sigma=sigma_kappa,
+        detection_sigma_corrected=sigma_kappa,
+        n_trials=1,
         fit_method="freq_domain",
         linear_mode_estimates=linear,
     )
@@ -732,7 +762,7 @@ def analyze_ringdown_segment(
     )
 
 
-def stack_posteriors(posteriors: list) -> StackedPosterior:
+def stack_posteriors(posteriors: list, n_trials: int = 1) -> StackedPosterior:
     """Stack posteriors across multiple events.
 
     Bown's principle (US2,037,847): accumulate evidence from
@@ -789,6 +819,7 @@ def stack_posteriors(posteriors: list) -> StackedPosterior:
     detection_sigma = np.sqrt(
         max(0.0, 2.0 * (np.max(stacked_log_l) - stacked_log_l[linear_idx]))
     )
+    detection_sigma_corrected = _look_elsewhere_correction(detection_sigma, n_trials)
 
     return StackedPosterior(
         event_names=[p.event_name for p in posteriors],
@@ -802,5 +833,7 @@ def stack_posteriors(posteriors: list) -> StackedPosterior:
         kappa_upper_90=kappa_upper_90,
         log_bayes_factor=log_bf_sum,
         detection_sigma=detection_sigma,
+        detection_sigma_corrected=detection_sigma_corrected,
+        n_trials=n_trials,
         n_events=len(posteriors),
     )

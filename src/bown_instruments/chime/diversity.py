@@ -9,6 +9,7 @@ treating all channels equally.
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass
 
 import numpy as np
@@ -179,6 +180,23 @@ def compute_diversity(
 
     if not subbands:
         raise ValueError("No valid sub-bands found")
+
+    # Check for inter-segment temporal correlation, which would violate
+    # the assumption of independent weights in the diversity combination.
+    # If adjacent sub-bands have highly correlated scatter patterns, the
+    # effective number of independent channels is smaller than n_subbands.
+    if len(subbands) >= 3:
+        scatters = np.array([sb.scatter_ppm for sb in subbands])
+        if len(scatters) > 2:
+            autocorr = np.corrcoef(scatters[:-1], scatters[1:])[0, 1]
+            if abs(autocorr) > 0.7:
+                warnings.warn(
+                    f"High inter-sub-band scatter correlation (r={autocorr:.2f}). "
+                    "Adjacent sub-bands are not independent — the diversity "
+                    "improvement factor may be overestimated. Consider checking "
+                    "for temporal systematics correlated across wavelength.",
+                    stacklevel=2,
+                )
 
     # Normalize weights
     total_weight = sum(sb.weight for sb in subbands)

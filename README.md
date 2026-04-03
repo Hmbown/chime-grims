@@ -2,38 +2,52 @@
 
 **Measure your signal path before you trust your result.**
 
-One package, two instruments, a shared discipline inherited from Ralph Bown (1891-1966), who directed radio research at Bell Telephone Laboratories. Bown understood that every measurement system degrades silently unless you build the diagnostic into the instrument itself.
+Unified Python package (v0.2.0) for two astrophysical measurement instruments and a small **core** library of reusable patterns. Both instruments inherit an engineering discipline from Ralph Bown (1891–1966), Bell Telephone Laboratories: treat degradation and silent failure as normal operating conditions, and build the diagnostic into the measurement. See [CLAUDE.md](CLAUDE.md) for the project’s stated engineering questions and patent context.
+
+| | **CHIME** | **GRIM-S** | **core** |
+|---|-----------|------------|----------|
+| **Role** | Channel Health & Instrument Metrology for Exoplanets | Gravitational Intermodulation Spectrometer | Shared measurement primitives |
+| **Domain** | JWST transit spectroscopy | LIGO/Virgo/KAGRA ringdowns | — |
+| **What it measures** | Per-wavelength noise quality (grades A–D) | Nonlinear mode-coupling coefficient κ (kappa) | Injection recovery; quality-weighted combination; health checks |
+| **Bown anchor** | Diversity-style channel grading (US 1,747,221) | Self-test before trust (US 1,573,801) | Both patterns exposed as APIs |
+
+**Repository:** [github.com/Hmbown/chime-grims](https://github.com/Hmbown/chime-grims) · **Tracking:** [Linear — bown-instruments](https://linear.app/shannon-labs/project/bown-instruments-9a003df614d9)
+
+---
+
+## Get started
 
 ```bash
-pip install -e ".[all]"      # both instruments
-bown chime WASP-39           # JWST channel diagnostics
-bown grims --events 32       # GW ringdown coupling
-bown selftest                # verify both pipelines
+git clone https://github.com/Hmbown/chime-grims.git && cd chime-grims
+pip install -e ".[dev]"          # all instruments + tests + ruff
+
+bown chime WASP-39               # JWST channel diagnostics (MAST)
+bown grims --events 32           # GRIM-S stack (subset of catalog)
+bown selftest                    # injection-recovery checks
+bown --version                   # 0.2.0
 ```
 
-## The instruments
+Optional installs: `pip install -e ".[chime]"` or `".[grims]"` only. On PyPI (when published): `bown-instruments[chime]`, `bown-instruments[grims]`, or `[all]`.
 
-| | CHIME | GRIM-S |
-|---|---|---|
-| **Full name** | Channel Health & Instrument Metrology for Exoplanets | Gravitational Intermodulation Spectrometer |
-| **Domain** | JWST transit spectroscopy | LIGO/Virgo/KAGRA ringdowns |
-| **Measures** | Per-wavelength noise quality (grade A-D) | Nonlinear mode coupling coefficient (kappa) |
-| **Bown patent** | US 1,747,221 (1930) -- diversity reception | US 1,573,801 (1926) -- self-testing alarm |
-| **Key result** | WASP-39b segment quality varies 4x within one observation | kappa = +0.015 +/- 0.007 (2.2 sigma) across 128 BBH mergers |
+---
 
-### CHIME: Not all JWST segments are created equal
+## What each instrument does
 
-Applied to WASP-39b NIRSpec G395H data (JWST ERS Program 1366), CHIME finds that within a single observation, segment quality varies by **4x**. Segment 1 approaches photon-limited performance (17/18 A-grade bins); segment 2 is systematic-dominated (0/18 A-grade bins, 4.89x photon noise). Blindly concatenating segments without this diagnostic degrades the transmission spectrum.
+### CHIME — JWST channel and segment quality
+
+CHIME asks whether reduced archive products are empirically consistent with photon noise and white-noise averaging, per wavelength and per segment. It turns scatter, systematic excess, and Allan-style binning tests into **A/B/C/D grades** and **diversity weights** so bad channels or segments do not dominate combined spectra.
+
+**Example result (WASP-39b, NIRSpec G395H, ERS Program 1366):** segment quality varies about **4×** within one observation: one segment near photon-limited (17/18 A-grade bins), another systematic-dominated (0/18 A-grade, **4.89×** photon noise). Concatenating without this step smears the transmission spectrum.
 
 <p align="center">
-  <img src="results/chime/wasp39_fit/chime_wasp_39_1.png" width="600" alt="CHIME diagnostic: WASP-39b segment quality varies 4x within a single JWST observation">
+  <img src="results/chime/wasp39_fit/chime_wasp_39_1.png" width="600" alt="CHIME diagnostic: WASP-39b segment quality varies within one JWST observation">
 </p>
 
-**10 targets, 61 observations, 199 segments surveyed.** Median segment quality is 1.97x photon noise.
+**Survey status:** the full archive survey covers 10 distinct targets, 61 observations, and 199 NIRSpec segments; the committed subset in `results/chime/channel_survey/` contains 10 segments across 3 observations and 2 targets. Median segment quality in the full survey is **1.97×** photon noise. **Ephemerides** for CLI/API use: **34** packaged lookup keys (aliases and multi-planet entries); `bown chime --targets` lists them.
 
-### GRIM-S: Constraining nonlinear mode coupling in black hole ringdowns
+### GRIM-S — ringdown coupling (κ)
 
-After a binary black hole merger, the remnant rings down through quasinormal modes. At second order, Einstein's field equations produce a quadratic daughter mode whose amplitude is proportional to kappa. GRIM-S estimates kappa by phase-locking the daughter template to the parent mode and stacking across 128 events from GWTC-3.
+After a BBH merger, the remnant ringdown is described by quasinormal modes. Second-order physics introduces a daughter contribution scaled by **κ**. GRIM-S **phase-locks** a κ-parameterized template to the parent mode and **stacks** events (with **weight caps** so no single event dominates—same diversity idea as CHIME, different domain).
 
 <p align="center">
   <picture>
@@ -42,89 +56,67 @@ After a binary black hole merger, the remnant rings down through quasinormal mod
   </picture>
 </p>
 
-| Phase | Events | kappa | Significance | What changed |
-|---|---|---|---|---|
-| 1 | 32 | -0.047 +/- 0.043 | 1.1 sigma | Initial H1-only baseline |
-| 2 | 134 | +0.028 +/- 0.019 | 1.5 sigma | Expanded catalog |
-| 2.5 | 122 | +0.016 +/- 0.030 | 0.5 sigma | Colored-noise likelihood |
-| **3** | **128** | **+0.015 +/- 0.007** | **2.2 sigma** | **Multi-detector + weight-capped stacking** |
+| Phase | Events | κ | Significance | Change |
+|---:|---:|---|---:|---|
+| 1 | 32 | −0.047 ± 0.043 | 1.1σ | H1-only baseline |
+| 2 | 134 | +0.028 ± 0.019 | 1.5σ | Expanded catalog |
+| 2.5 | 122 | +0.016 ± 0.030 | 0.5σ | Colored-noise likelihood |
+| **3** | **128** | **+0.015 ± 0.007** | **2.2σ local** | Multi-detector + capped weights; jackknife stability caveat currently prevents treating this as robust |
 
-## The shared discipline
+---
 
-Both instruments are built on the same engineering principles:
+## Design principles (encoded, not decorative)
 
-**1. Self-test before science** (US 1,573,801). Inject a known signal through your own pipeline. If you can't recover what you put in, don't trust what comes out. Both instruments run injection-recovery tests before reporting results.
+1. **Self-test** — Inject and recover through the same pipeline you use for science (`bown selftest`; `bown_instruments.core` and instrument `self_test` modules).
+2. **Diversity weighting** — Measure quality per channel or per event, then combine with weights that down-rank poor contributors (`core.diversity_weight`; CHIME bin grades; GRIM-S weight caps).
+3. **Observable diagnostics** — Every claim should point to a plot, metric, or table you can re-run.
 
-**2. Diversity weighting** (US 1,747,221). Grade your channels independently, weight the combination by measured quality. Don't let one bad channel corrupt the result. CHIME grades wavelength bins A-D; GRIM-S caps per-event weights to prevent single-event dominance.
+`bown_instruments.core` supplies **`SelfTest`**, **`diversity_weight`**, **`check_instrument_health`** for reuse outside these two instruments.
 
-**3. Measure first, engineer second.** If you can't point to a diagnostic that tells you the instrument is working, you are guessing.
+---
 
-These aren't metaphors. They are codified in `bown_instruments.core` as reusable patterns: `SelfTest`, `diversity_weight`, `check_instrument_health`.
+## Python imports
 
-## Package structure
-
-```
-src/bown_instruments/
-    __init__.py              Version, top-level docstring
-    cli.py                   Unified CLI: bown {chime,grims,selftest}
-    core/                    Shared Bown measurement patterns
-        self_test.py         Injection-recovery protocol (US 1,573,801)
-        diversity.py         Quality-weighted combination (US 1,747,221)
-        diagnostics.py       Instrument health checks
-    chime/                   JWST channel diagnostics
-        channel_map.py       Per-wavelength noise grading (A/B/C/D)
-        diversity.py         Quality-weighted spectral combination
-        ephemeris.py         Transit ephemerides for 27 targets
-        extract.py           FITS data extraction and alignment
-        mast.py              MAST archive search and download
-        transit_fit.py       Mandel-Agol transit model + GP systematics
-        plot.py              Diagnostic visualizations
-        cli.py               CHIME-specific CLI logic
-    grims/                   Gravitational ringdown coupling
-        qnm_modes.py         Kerr QNM frequency catalog
-        ringdown_templates.py Waveform generation (kappa-parameterized)
-        gwtc_pipeline.py     GWTC-3 catalog and GWOSC data loading
-        whiten.py            ASD estimation, whitening, bandpass
-        phase_locked_search.py Phase-locked matched filter
-        bayesian_analysis.py Posterior estimation and stacking
-        jackknife.py         Leave-one-out stability test
-        self_test.py         Injection-recovery validation
-        mass_analysis.py     Full-catalog pipeline orchestrator
-        + 8 more modules (Fisher, sampling, colored likelihood, ...)
-
-tests/                       69 tests (50 CHIME + 19 GRIM-S)
-scripts/                     Analysis runners and data management
-results/                     Committed analysis outputs
-data/                        GW150914 reference strain (1 MB)
-patents/                     13 of Ralph Bown's original patent PDFs
+```python
+from bown_instruments.chime import compute_channel_map, compute_diversity
+from bown_instruments.grims.qnm_modes import KerrQNMCatalog
+from bown_instruments.core import SelfTest, diversity_weight
 ```
 
-## Installation
+CHIME-specific workflow pieces: `find_x1dints`, `download_product`, `extract_transit_data`, `get_ephemeris` (see `docs/chime/README.md`).
+
+---
+
+## Repository layout
+
+| Path | Contents |
+|------|----------|
+| `src/bown_instruments/core/` | `self_test`, `diversity`, `diagnostics` |
+| `src/bown_instruments/chime/` | Channel map, diversity combine, ephemeris, MAST I/O, extract, transit fit, plot, CLI |
+| `src/bown_instruments/grims/` | QNM catalog, templates, GWTC/GWOSC I/O, whitening, phase-locked search, Bayesian stack, jackknife, mass orchestration, + supporting modules |
+| `tests/chime/` · `tests/grims/` | 50 + 19 tests (69 total); GRIM-S uses committed ~1 MB GW150914 where needed |
+| `examples/chime/` | Seven worked examples |
+| `scripts/grims/` | Catalog refresh, downloads, batch analyses |
+| `results/` | Committed outputs (`chime/`, `grims/`, `grims_plots/`) |
+| `patents/` | Thirteen Ralph Bown patent PDFs (historical context) |
+
+Full filename-level tree is available under `src/bown_instruments/` in the source; rules for imports: **public** code uses the `bown_instruments.` prefix; GRIM-S **internal** modules may use relative imports.
+
+---
+
+## Data and tests
+
+- **CHIME:** Results and manifests in `results/chime/`; FITS from [MAST](https://mast.stsci.edu) on demand. Details: [DATA.md](DATA.md).
+- **GRIM-S:** Reference strain small enough to commit; full GWTC downloads via scripts (~8.5 GB for O4-scale work). See [DATA.md](DATA.md) and `scripts/grims/`.
 
 ```bash
-pip install -e ".[all]"       # Everything
-pip install -e ".[chime]"     # CHIME only (adds astropy, astroquery)
-pip install -e ".[grims]"     # GRIM-S only (adds h5py, qnm)
-pip install -e ".[dev]"       # All + pytest + ruff
+python -m pytest tests/ -q       # expect 69 passed
 ```
 
-## Data
+---
 
-- **CHIME**: Analysis results committed. Raw FITS files fetched on-demand from MAST. See [DATA.md](DATA.md).
-- **GRIM-S**: GW150914 reference strain committed. Full dataset (~8.5 GB) from [GWOSC](https://gwosc.org). Scripts in `scripts/grims/`.
+## Author and license
 
-## Tests
-
-```bash
-python -m pytest tests/ -q    # 69 tests
-```
-
-## Author
-
-Hunter Bown (hunter@shannonlabs.dev)
-
-Great-grandson of Ralph Bown. The transistor enabled the circuits. The circuits enabled the medicine. The medicine enabled me. Now I'm finishing what he started: instruments that measure their own signal path.
-
-## License
+**Hunter Bown** — hunter@shannonlabs.dev · Great-grandson of Ralph Bown.
 
 MIT

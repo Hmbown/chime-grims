@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 
 from bown_instruments.chime.channel_map import (
+    BinResult,
     channel_quality,
     compute_channel_map,
     _grade_bin,
@@ -174,6 +175,18 @@ class TestChannelMap:
         detectable = cmap.summary.get("detectable_molecules", [])
         assert isinstance(detectable, list)
 
+    def test_custom_thresholds_flow_through_summary_outputs(self):
+        bins = [
+            BinResult(1.0, (0.9, 1.1), 10, 1e4, 100, 50, 2.5, 20000, [], 1.4, "B"),
+            BinResult(1.1, (1.1, 1.3), 10, 1e4, 100, 50, 2.6, 20000, [], 1.3, "B"),
+        ]
+
+        trust_default = _find_trust_regions(bins)
+        trust_relaxed = _find_trust_regions(bins, excess_a=3.0, allan_a=1.5)
+
+        assert trust_default == []
+        assert len(trust_relaxed) == 1
+
 
 class TestWeights:
     def test_weights_sum_to_one(self):
@@ -187,3 +200,14 @@ class TestWeights:
         weights = _compute_weights(bins)
         assert abs(weights.sum() - 1.0) < 1e-6
         assert weights[1] == 0.0  # D-grade is zeroed
+
+    def test_weights_use_configured_c_grade_rolloff(self):
+        bins = [
+            BinResult(1.0, (0.9, 1.1), 10, 1e4, 100, 50, 1.5, 20000, [], 1.0, "A"),
+            BinResult(2.0, (1.9, 2.1), 10, 1e4, 100, 50, 6.0, 20000, [], 1.0, "C"),
+        ]
+
+        default_weights = _compute_weights(bins)
+        custom_weights = _compute_weights(bins, excess_b=5.5, excess_c=6.5)
+
+        assert custom_weights[1] < default_weights[1]

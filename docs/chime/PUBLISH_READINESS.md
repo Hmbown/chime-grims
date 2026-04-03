@@ -4,37 +4,25 @@ Date: 2026-04-03
 
 ## Current status
 
-`chime` is close to GitHub-release ready from this repository, but it is not fully publish-ready yet.
+CHIME ships inside the unified **`bown-instruments`** package in this monorepo ([`Hmbown/chime-grims`](https://github.com/Hmbown/chime-grims)). PyPI publication, if desired, is for **`bown-instruments`** with optional extras **`[chime]`** and **`[grims]`**, not a separate `chime-jwst` distribution.
 
 ## Ready now
 
-- The package is structurally self-contained under [`chime/`](/Volumes/VIXinSSD/drbown/bown-power/chime).
-- Packaging metadata exists in [`chime/pyproject.toml`](/Volumes/VIXinSSD/drbown/bown-power/chime/pyproject.toml).
-- Citation metadata exists in [`chime/CITATION.cff`](/Volumes/VIXinSSD/drbown/bown-power/chime/CITATION.cff).
-- Changelog and package README are present.
-- The package includes tests, examples, and checked-in result artifacts.
-- Author metadata now names Hunter Bown in package and citation files.
+- Single top-level [`pyproject.toml`](../../pyproject.toml) defines `bown-instruments` and the `bown` CLI.
+- CHIME implementation lives under [`src/bown_instruments/chime/`](../../src/bown_instruments/chime/).
+- Tests under [`tests/chime/`](../../tests/chime/); examples under [`examples/chime/`](../../examples/chime/).
+- Committed CHIME result artifacts under [`results/chime/`](../../results/chime/).
 
-## Blocking items before public release
+## Recommended before a PyPI release
 
-- The package changes still need to be committed and pushed as a coherent release unit. This workspace also contains unrelated repo changes outside `chime/`, so release scope should be chosen deliberately when creating the GitHub commit or PR.
+- Confirm the **`bown-instruments`** name on PyPI (test upload to TestPyPI first if unsure).
+- Tag releases from this repo (e.g. `v0.2.0`) so `repository-code` in citation metadata matches a reproducible revision.
 
-## Recommended before release
+## Verified checks (monorepo)
 
-- Decide whether `chime` will live in this monorepo long-term or move to its own repo later. If it moves, update all package URLs again at that time.
-- Keep [`chime/results/`](/Volumes/VIXinSSD/drbown/bown-power/chime/results) only if you want reproducibility material in the public repo. Local run output under `chime_output/` should stay ignored rather than checked in.
-- If PyPI publication is planned, verify the project name `chime-jwst` is the intended final package name.
+- `python -m pytest tests/ -q`: run from repository root after `pip install -e ".[dev]"`.
+- `bown --version` and `bown chime --help` / `bown chime --targets`: CLI smoke tests.
 
-## Verified checks
+## Historical note
 
-- `pytest -q chime/tests`: 50 passed
-- `python3 -m compileall chime/src`: passed
-- `python3 -m build --sdist --wheel chime`: passed
-- Wheel install into a fresh virtualenv: passed
-- CLI smoke tests from installed wheel:
-  - `chime --help`: passed
-  - `chime --targets`: passed
-
-## Remaining uncertainty
-
-- Tests were not rerun inside the fresh virtualenv after wheel installation; only install and CLI smoke checks were performed there.
+Older drafts referred to a standalone `chime/` tree and the name `chime-jwst`; those paths are superseded by the unified package layout above.

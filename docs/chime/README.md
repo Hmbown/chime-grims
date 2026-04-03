@@ -2,6 +2,8 @@
 
 **CH**annel quality and **I**nstrument **M**etrology for **E**xoplanets
 
+CHIME is distributed as part of **`bown-instruments`** in the [chime-grims](https://github.com/Hmbown/chime-grims) monorepo (`pip install bown-instruments[chime]` or editable install from repo root).
+
 `chime` is a diagnostic package for JWST transit spectroscopy. It measures
 per-wavelength, per-segment noise quality in reduced time-series products and
 asks:
@@ -37,33 +39,35 @@ the underlying idea of empirical channel grading and selective combining is not.
 
 ## Installation
 
-```bash
-pip install chime-jwst
-```
-
-Or from source:
+Published (when released to PyPI):
 
 ```bash
-git clone https://github.com/Hmbown/bownpower.git
-cd bownpower/chime
-pip install -e .
+pip install "bown-instruments[chime]"
 ```
 
-Dependencies: `numpy`, `scipy`, `matplotlib`, `astropy`, `astroquery`.
+From source (repository root):
+
+```bash
+git clone https://github.com/Hmbown/chime-grims.git
+cd chime-grims
+pip install -e ".[chime]"
+```
+
+Core dependencies are listed in the root [`pyproject.toml`](../../pyproject.toml); CHIME adds `astropy` and `astroquery`.
 
 ## Quick start
 
 ### CLI
 
 ```bash
-# List targets with ephemerides included in the package
-chime --targets
+# List targets with ephemerides included in the package (34 table keys)
+bown chime --targets
 
 # Run a single-target diagnostic on public archive products
-chime WASP-39
+bown chime WASP-39
 
 # Compare per-segment products for a target
-chime WASP-39 --segments
+bown chime WASP-39 --segments
 ```
 
 The CLI will search MAST for `x1dints` products, download them, identify
@@ -73,7 +77,7 @@ and write figures and machine-readable outputs.
 ### Python API
 
 ```python
-from chime import (
+from bown_instruments.chime import (
     compute_channel_map,
     compute_diversity,
     download_product,
@@ -129,8 +133,13 @@ div = compute_diversity(td.flux_cube, td.wavelength, in_transit)
 
 ## Survey results
 
-This repository includes a checked-in survey of public JWST NIRSpec transit
-products (199 segments, 61 observations, 10 targets, 16 programs).
+This repository includes a checked-in subset of a larger survey of public JWST
+NIRSpec transit products. The full survey covers 199 segments, 61 observations,
+10 distinct targets, and 16 programs; the committed data in
+`results/chime/channel_survey/` contains 10 segments across 3 observations and
+2 targets (WASP-107 and WASP-39). The packaged ephemeris exposes 34 lookup keys
+(see `bown chime --targets`); reproducing the full survey requires MAST network
+access via the provided scripts.
 
 Key findings from the current archive sample:
 
@@ -145,24 +154,17 @@ These are archive-sample results, not instrument-wide causal claims. Target,
 grating, detector, and program are partly confounded.
 
 Start with:
-- [`results/survey/SURVEY.md`](../results/survey/SURVEY.md)
-- [`results/survey/CROSS_TARGET.md`](../results/survey/CROSS_TARGET.md)
-- [`results/channel_survey/FINDING.md`](results/channel_survey/FINDING.md)
+
+- [`results/chime/channel_survey/FINDING.md`](../../results/chime/channel_survey/FINDING.md)
+- Checked-in survey JSON under [`results/chime/channel_survey/`](../../results/chime/channel_survey/)
 
 ### Reproducing the survey
 
-Cross-target analysis from checked-in data (no MAST access needed):
+From the repository root, run CHIME tests and examples (full archive sweeps require MAST access and network):
 
 ```bash
-cd ..
-python run_cross_target_analysis.py
-```
-
-Full archive survey (requires network, slow):
-
-```bash
-cd ..
-python run_jwst_survey.py
+python -m pytest tests/chime/ -q
+python examples/chime/multi_target_survey.py --help
 ```
 
 ## How to use the diagnostics scientifically
@@ -182,11 +184,11 @@ python run_jwst_survey.py
 
 ## Examples
 
-- [`examples/segment_quality_check.py`](examples/segment_quality_check.py) --
+- [`examples/chime/segment_quality_check.py`](../../examples/chime/segment_quality_check.py) --
   one-page quality report for any x1dints file
-- [`examples/multi_target_survey.py`](examples/multi_target_survey.py) --
+- [`examples/chime/multi_target_survey.py`](../../examples/chime/multi_target_survey.py) --
   multi-target archive survey
 
 ## License
 
-MIT. See [`LICENSE`](LICENSE).
+MIT. See [`LICENSE`](../../LICENSE) at the repository root.
